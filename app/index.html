@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0e13">
+<title>改枪码工作台</title>
+<link rel="icon" href="icon.ico">
+<link rel="apple-touch-icon" href="icon.ico">
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="改枪码">
+<script>
+/* 主题色定义 + 提前应用，避免刷新时闪回默认色 */
+window.DELTA_THEMES = {
+  delta:  { name: "三角洲橙", accent: "#ff8a1e", accent2: "#ffb05c", on: "#1d1002", rgb: "255, 138, 30" },
+  nvg:    { name: "夜视绿",   accent: "#45d483", accent2: "#8ce9b4", on: "#04170c", rgb: "69, 212, 131" },
+  ocean:  { name: "深海蓝",   accent: "#38b6ff", accent2: "#7cd3ff", on: "#041522", rgb: "56, 182, 255" },
+  ember:  { name: "赤焰红",   accent: "#ff5a52", accent2: "#ff8f88", on: "#1f0505", rgb: "255, 90, 82" },
+  violet: { name: "幽紫",     accent: "#bf5af2", accent2: "#d99cf8", on: "#170522", rgb: "191, 90, 242" },
+  gold:   { name: "沙漠金",   accent: "#ffc53d", accent2: "#ffe08a", on: "#1f1502", rgb: "255, 197, 61" }
+};
+(function () {
+  try {
+    var t = localStorage.getItem("delta_theme"), s = t && window.DELTA_THEMES[t];
+    if (s) {
+      var d = document.documentElement.style;
+      d.setProperty("--accent", s.accent);
+      d.setProperty("--accent-2", s.accent2);
+      d.setProperty("--on-accent", s.on);
+      d.setProperty("--accent-rgb", s.rgb);
+    }
+  } catch (e) {}
+})();
+</script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- 背景色晕：供毛玻璃折射（b1 跟随主题色） -->
+<div class="bg" aria-hidden="true"><i class="b1"></i><i class="b2"></i><i class="b3"></i></div>
+
+<header class="topbar">
+  <div class="brand">
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="6.6" stroke="currentColor" stroke-width="1.9"/>
+      <path d="M12 1.6v3.6M12 18.8v3.6M1.6 12h3.6M18.8 12h3.6" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+      <circle cx="12" cy="12" r="2.1" fill="currentColor"/>
+    </svg>
+    <div class="brand-txt">
+      <h1>改枪码工作台</h1>
+      <span id="syncState" class="sync-state"><i class="dot gray"></i>连接中…</span>
+    </div>
+  </div>
+  <div class="top-actions">
+    <input id="search" class="search" type="search" placeholder="搜索枪名 / 改枪码 / 备注" autocomplete="off">
+    <button id="btnSettings" class="btn ghost" title="设置（主题颜色 / 手机连接）">⚙️</button>
+    <button id="btnAdd" class="btn primary">＋ 新增改枪码</button>
+  </div>
+</header>
+
+<div class="layout">
+  <aside id="sidebar" class="sidebar" aria-label="枪械分类"></aside>
+  <main class="main">
+    <div id="grid" class="grid"></div>
+    <div id="empty" class="empty hidden">
+      <div class="empty-ic">🪖</div>
+      <p id="emptyText">还没有改枪码</p>
+      <p class="empty-sub">点「＋ 新增」手动添加，或在弹窗中切到「导入文件」批量导入</p>
+    </div>
+  </main>
+</div>
+
+<button id="fab" class="fab" title="新增改枪码">＋</button>
+
+<!-- 新增 / 编辑弹窗 -->
+<div id="modal" class="overlay hidden" role="dialog" aria-modal="true">
+  <div class="dialog">
+    <div class="dialog-head">
+      <h2 id="modalTitle">新增改枪码</h2>
+      <button class="icon-btn" data-close title="关闭">✕</button>
+    </div>
+    <form id="editorForm">
+      <!-- 分段控制器：丝滑切换 + 阻尼回弹 -->
+      <div class="seg" id="editorSeg">
+        <span class="seg-thumb" aria-hidden="true"></span>
+        <button type="button" class="seg-btn on" data-page="form">✏️ 改枪码</button>
+        <button type="button" class="seg-btn" data-page="import">📥 导入文件</button>
+      </div>
+      <div class="epages" id="editorPages">
+        <!-- 页一：改枪码表单 -->
+        <div class="epage" data-page="form">
+          <label class="field">
+            <span>枪械分类</span>
+            <select id="fCategory"></select>
+          </label>
+          <label class="field">
+            <span>枪械名称 <em>必填</em></span>
+            <input id="fName" list="gunNames" maxlength="40" placeholder="如：K416" autocomplete="off">
+          </label>
+          <label class="field">
+            <span>改枪码 <em>必填</em></span>
+            <input id="fCode" class="mono" maxlength="80" placeholder="粘贴游戏分享码，如 A1B2C3D4E5" autocomplete="off" spellcheck="false">
+          </label>
+          <label class="field">
+            <span>备注 <em class="opt">选填</em></span>
+            <textarea id="fNote" rows="2" maxlength="200" placeholder="如：近战满配 / 巷战泼水 / 来自某博主"></textarea>
+          </label>
+        </div>
+        <!-- 页二：导入文件（虚线拖放区） -->
+        <div class="epage" data-page="import">
+          <div class="dropzone" id="dropzone" role="button" tabindex="0" aria-label="选择或拖入要导入的文件">
+            <span class="dz-ic">📥</span>
+            <b>选择或拖入文件</b>
+            <small>Markdown · Word(.docx) · Excel(.xlsx) · CSV · TXT</small>
+            <small class="dz-sub">解析后先预览勾选，确认才导入</small>
+          </div>
+          <p class="dz-hint">也可以把文件直接拖到本窗口的任意位置</p>
+        </div>
+      </div>
+      <div class="dialog-foot">
+        <button type="button" class="btn ghost" data-close>取消</button>
+        <button type="submit" class="btn primary">保存</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 设置弹窗（主题颜色 / 手机连接的统一入口） -->
+<div id="settingsModal" class="overlay hidden" role="dialog" aria-modal="true">
+  <div class="dialog">
+    <div class="dialog-head">
+      <h2>⚙️ 设置</h2>
+      <button class="icon-btn" data-close title="关闭">✕</button>
+    </div>
+    <div class="settings-list">
+      <button class="settings-item" id="rowTheme" type="button">
+        <span class="row-ic">🎨</span>
+        <span class="row-txt"><b>主题颜色</b><small id="rowThemeName">三角洲橙</small></span>
+        <span class="row-arrow">›</span>
+      </button>
+      <button class="settings-item" id="rowPhone" type="button">
+        <span class="row-ic">📱</span>
+        <span class="row-txt"><b>手机连接</b><small>同一 WiFi 下扫码互相同步</small></span>
+        <span class="row-arrow">›</span>
+      </button>
+    </div>
+    <p class="backup-hint">主题颜色按设备分别记忆，电脑与手机可各自选择</p>
+  </div>
+</div>
+
+<!-- 手机连接弹窗 -->
+<div id="phoneModal" class="overlay hidden" role="dialog" aria-modal="true">
+  <div class="dialog">
+    <div class="dialog-head">
+      <h2>📱 手机连接</h2>
+      <button class="icon-btn" data-close title="关闭">✕</button>
+    </div>
+    <div id="phoneBody">
+      <p class="muted">用手机浏览器「扫一扫」下方二维码（或手动输入地址），即可在手机上查看、收藏改枪码，电脑端会自动同步。</p>
+      <div id="qrBox" class="qr-box"></div>
+      <div class="url-row">
+        <code id="phoneUrl">…</code>
+        <button id="btnCopyUrl" class="btn small ghost">复制</button>
+      </div>
+      <ol class="steps">
+        <li>手机与电脑连接<b>同一个 WiFi</b>（路由器）</li>
+        <li>手机扫码或输入地址，可「添加到主屏幕」当 App 用</li>
+        <li>首次访问若弹出 Windows 防火墙提示，勾选「专用网络」并点<b>允许访问</b></li>
+      </ol>
+    </div>
+    <div class="divider"></div>
+    <div class="backup-row">
+      <span class="muted">数据备份</span>
+      <span>
+        <button id="btnExport" class="btn small ghost">导出备份</button>
+        <button id="btnImport" class="btn small ghost">导入 JSON</button>
+        <input id="importFile" type="file" accept=".json,application/json" class="hidden">
+      </span>
+    </div>
+    <div class="backup-row" style="margin-top:9px">
+      <span class="muted">从文件导入</span>
+      <span>
+        <button id="btnImportFile" class="btn small ghost">选择文件</button>
+        <input id="importPick" type="file" accept=".md,.markdown,.txt,.csv,.tsv,.xlsx,.docx" class="hidden">
+      </span>
+    </div>
+    <p class="backup-hint">支持 Markdown / Word(.docx) / Excel(.xlsx) / CSV / TXT，解析后先预览勾选再导入，重复的改枪码自动跳过</p>
+  </div>
+</div>
+
+<!-- 文件导入预览弹窗 -->
+<div id="fileModal" class="overlay hidden" role="dialog" aria-modal="true">
+  <div class="dialog">
+    <div class="dialog-head">
+      <h2>导入预览</h2>
+      <button class="icon-btn" data-close title="关闭">✕</button>
+    </div>
+    <p class="muted" id="fileMeta">…</p>
+    <div id="fileRows" class="file-rows"></div>
+    <div class="dialog-foot">
+      <span class="muted" id="fileCount"></span>
+      <button type="button" class="btn ghost" data-close>取消</button>
+      <button type="button" id="btnImportConfirm" class="btn primary">导入选中</button>
+    </div>
+  </div>
+</div>
+
+<!-- 主题颜色弹窗 -->
+<div id="themeModal" class="overlay hidden" role="dialog" aria-modal="true">
+  <div class="dialog">
+    <div class="dialog-head">
+      <h2>🎨 主题颜色</h2>
+      <button class="icon-btn" data-close title="关闭">✕</button>
+    </div>
+    <div id="themeList" class="theme-list"></div>
+    <p class="backup-hint">主题只保存在当前设备上，电脑与手机可以各自选择喜欢的颜色</p>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<!-- 常用枪名参考（可直接输入其他枪名） -->
+<datalist id="gunNames">
+  <option value="M4A1"><option value="K416"><option value="AKM"><option value="AK-12">
+  <option value="CAR-15"><option value="M16A4"><option value="SCAR-H"><option value="AUG">
+  <option value="Groza"><option value="L85A2"><option value="AS Val"><option value="SG552"><option value="M7">
+  <option value="MP5"><option value="MP7"><option value="UZI"><option value="Vector">
+  <option value="P90"><option value="SMG-45"><option value="SR-3M"><option value="QCQ171"><option value="JS9">
+  <option value="M249"><option value="PKM"><option value="QJB201">
+  <option value="SKS"><option value="MK14"><option value="SR-25">
+  <option value="M700"><option value="R93"><option value="SV-98">
+  <option value="M870"><option value="S12K">
+  <option value="M1911"><option value="G17">
+</datalist>
+
+<script src="qrcode.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
