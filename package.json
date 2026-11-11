@@ -1,7 +1,7 @@
 {
   "name": "delta-gun-codes",
   "productName": "改枪码工作台",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "三角洲行动 · 改枪码工作台：存储、分类、复制改枪码，支持手机同步与多格式导入",
   "main": "main.js",
   "license": "MIT",
@@ -32,7 +32,12 @@
     ],
     "win": {
       "target": [
-        { "target": "nsis", "arch": ["x64"] }
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "icon": "build/icon.ico"
     },
@@ -42,16 +47,22 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "shortcutName": "改枪码工作台",
-      "artifactName": "改枪码工作台-安装包-${version}.exe"
+      "artifactName": "delta-gun-codes-setup-${version}-${arch}.${ext}"
     },
     "mac": {
       "target": [
-        { "target": "dmg", "arch": ["x64", "arm64"] }
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
       ],
       "icon": "build/icon.png",
       "category": "public.app-category.utilities",
       "identity": null,
-      "artifactName": "改枪码工作台-${version}-${arch}.dmg"
+      "artifactName": "delta-gun-codes-${version}-${arch}.${ext}"
     },
     "publish": {
       "provider": "github",
